@@ -39,7 +39,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: "20"
+          node-version: "22"
           cache: ${{ steps.detect-pm.outputs.manager }}
 
       - name: Install dependencies
@@ -143,7 +143,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: "20"
+          node-version: "22"
           cache: ${{ steps.detect-pm.outputs.manager }}
 
       - name: Install dependencies
@@ -158,18 +158,37 @@ jobs:
 
       - name: Install ESLint & Prettier dependencies
         run: |
-          DEPS="eslint@^9.0.0 @eslint/js@^9.0.0 @typescript-eslint/eslint-plugin@^8.0.0 @typescript-eslint/parser@^8.0.0 prettier@^3.0.0"
-
-          if [ "${{ steps.detect-type.outputs.type }}" = "react" ] || [ "${{ steps.detect-type.outputs.type }}" = "nextjs" ]; then
-            DEPS="$DEPS eslint-plugin-react@^7.35.0 eslint-plugin-react-hooks@^4.6.0"
+          # Only install packages that aren't already in package.json
+          DEPS=""
+          
+          # Check each dependency
+          if ! grep -q '"eslint"' package.json 2>/dev/null; then
+            DEPS="$DEPS eslint@^9.0.0 @eslint/js@^9.0.0"
+          fi
+          
+          if ! grep -q '"@typescript-eslint' package.json 2>/dev/null && ! grep -q '"typescript-eslint"' package.json 2>/dev/null; then
+            DEPS="$DEPS @typescript-eslint/eslint-plugin@^8.0.0 @typescript-eslint/parser@^8.0.0"
+          fi
+          
+          if ! grep -q '"prettier"' package.json 2>/dev/null; then
+            DEPS="$DEPS prettier@^3.0.0"
           fi
 
-          if [ "${{ steps.detect-pm.outputs.manager }}" = "pnpm" ]; then
-            pnpm add -D $DEPS
-          elif [ "${{ steps.detect-pm.outputs.manager }}" = "yarn" ]; then
-            yarn add -D $DEPS
-          else
-            npm install --save-dev $DEPS
+          if [ "${{ steps.detect-type.outputs.type }}" = "react" ] || [ "${{ steps.detect-type.outputs.type }}" = "nextjs" ]; then
+            if ! grep -q '"eslint-plugin-react"' package.json 2>/dev/null; then
+              DEPS="$DEPS eslint-plugin-react@^7.35.0 eslint-plugin-react-hooks@^4.6.0"
+            fi
+          fi
+
+          # Only install if DEPS is not empty
+          if [ -n "$DEPS" ]; then
+            if [ "${{ steps.detect-pm.outputs.manager }}" = "pnpm" ]; then
+              pnpm add -D $DEPS
+            elif [ "${{ steps.detect-pm.outputs.manager }}" = "yarn" ]; then
+              yarn add -D $DEPS
+            else
+              npm install --save-dev $DEPS --legacy-peer-deps
+            fi
           fi
 
       - name: Run Prettier check
@@ -226,7 +245,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: "20"
+          node-version: "22"
           cache: ${{ steps.detect-pm.outputs.manager }}
 
       - name: Install dependencies
