@@ -8,6 +8,7 @@ export default [
   js.configs.recommended,
   {
     files: ["**/*.{js,mjs,cjs,jsx,ts,tsx}"],
+    ignores: ["eslint.config.js", "prettier.config.js", "*.config.js", "configs/**"],
     languageOptions: {
       parser: tsparser,
       parserOptions: {
