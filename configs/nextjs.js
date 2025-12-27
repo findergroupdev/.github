@@ -25,6 +25,16 @@ export default [
         document: "readonly",
         navigator: "readonly",
         console: "readonly",
+        fetch: "readonly",
+        Headers: "readonly",
+        Request: "readonly",
+        Response: "readonly",
+        setTimeout: "readonly",
+        clearTimeout: "readonly",
+        setInterval: "readonly",
+        clearInterval: "readonly",
+        queueMicrotask: "readonly",
+        crypto: "readonly",
         // ES2021 globals
         Promise: "readonly",
         Symbol: "readonly",
@@ -50,15 +60,6 @@ export default [
       },
     },
     rules: {
-      // TypeScript Specific Rules
-      "@typescript-eslint/explicit-function-return-type": [
-        "error",
-        {
-          allowExpressions: true,
-          allowTypedFunctionExpressions: true,
-          allowHigherOrderFunctions: true,
-        },
-      ],
       "@typescript-eslint/no-explicit-any": "error",
       "@typescript-eslint/no-unused-vars": [
         "error",
@@ -226,6 +227,7 @@ export default [
       "**/*.config.ts",
       "**/next-env.d.ts",
       "**/components/ui/**",
+      "version.js",
     ],
   },
 ];
