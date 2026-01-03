@@ -183,7 +183,7 @@ jobs:
           if [ "${{ steps.detect-type.outputs.type }}" = "react" ] || [ "${{ steps.detect-type.outputs.type }}" = "nextjs" ]; then
             if ! grep -q '"eslint-plugin-react"' package.json 2>/dev/null; then
               if grep -q 'eslint-plugin-react' configs/${{ steps.detect-type.outputs.type }}.js 2>/dev/null; then
-                DEPS="$DEPS eslint-plugin-react@^7.35.0 eslint-plugin-react-hooks@^4.6.0"
+                DEPS="$DEPS eslint-plugin-react@^7.35.0 eslint-plugin-react-hooks@^5.0.0"
               fi
             fi
           fi
