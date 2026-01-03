@@ -158,16 +158,22 @@ jobs:
 
       - name: Install ESLint & Prettier dependencies
         run: |
-          # Only install packages that aren't already in package.json
+          # Only install packages that aren't already in package.json or configs
           DEPS=""
           
-          # Check each dependency
+          # Check each dependency in both package.json and configs
           if ! grep -q '"eslint"' package.json 2>/dev/null; then
-            DEPS="$DEPS eslint@^9.0.0 @eslint/js@^9.0.0"
+            DEPS="$DEPS eslint@^9.0.0"
+          fi
+          
+          if ! grep -q '"@eslint/js"' package.json 2>/dev/null && grep -q 'from "@eslint/js"' configs/${{ steps.detect-type.outputs.type }}.js 2>/dev/null; then
+            DEPS="$DEPS @eslint/js@^9.0.0"
           fi
           
           if ! grep -q '"@typescript-eslint' package.json 2>/dev/null && ! grep -q '"typescript-eslint"' package.json 2>/dev/null; then
-            DEPS="$DEPS @typescript-eslint/eslint-plugin@^8.0.0 @typescript-eslint/parser@^8.0.0"
+            if grep -q 'from "@typescript-eslint' configs/${{ steps.detect-type.outputs.type }}.js 2>/dev/null; then
+              DEPS="$DEPS @typescript-eslint/eslint-plugin@^8.0.0 @typescript-eslint/parser@^8.0.0"
+            fi
           fi
           
           if ! grep -q '"prettier"' package.json 2>/dev/null; then
@@ -176,7 +182,9 @@ jobs:
 
           if [ "${{ steps.detect-type.outputs.type }}" = "react" ] || [ "${{ steps.detect-type.outputs.type }}" = "nextjs" ]; then
             if ! grep -q '"eslint-plugin-react"' package.json 2>/dev/null; then
-              DEPS="$DEPS eslint-plugin-react@^7.35.0 eslint-plugin-react-hooks@^4.6.0"
+              if grep -q 'eslint-plugin-react' configs/${{ steps.detect-type.outputs.type }}.js 2>/dev/null; then
+                DEPS="$DEPS eslint-plugin-react@^7.35.0 eslint-plugin-react-hooks@^4.6.0"
+              fi
             fi
           fi
 
