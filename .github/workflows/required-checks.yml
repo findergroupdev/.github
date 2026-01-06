@@ -1,0 +1,277 @@
+name: Required Checks
+
+on:
+  pull_request:
+  merge_group:
+
+jobs:
+  security-audit:
+    name: Security Audit
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Detect package manager
+        id: detect-pm
+        run: |
+          if [ -f "pnpm-lock.yaml" ]; then
+            echo "manager=pnpm" >> $GITHUB_OUTPUT
+            # Check if packageManager is specified in package.json
+            if grep -q '"packageManager"' package.json 2>/dev/null; then
+              echo "pnpm-version=" >> $GITHUB_OUTPUT
+            else
+              echo "pnpm-version=latest" >> $GITHUB_OUTPUT
+            fi
+          elif [ -f "yarn.lock" ]; then
+            echo "manager=yarn" >> $GITHUB_OUTPUT
+          else
+            echo "manager=npm" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Setup pnpm
+        if: steps.detect-pm.outputs.manager == 'pnpm'
+        uses: pnpm/action-setup@v4
+        with:
+          version: ${{ steps.detect-pm.outputs.pnpm-version }}
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: ${{ steps.detect-pm.outputs.manager }}
+
+      - name: Install dependencies
+        run: |
+          if [ "${{ steps.detect-pm.outputs.manager }}" = "pnpm" ]; then
+            pnpm install --frozen-lockfile
+          elif [ "${{ steps.detect-pm.outputs.manager }}" = "yarn" ]; then
+            yarn install --frozen-lockfile
+          else
+            npm ci
+          fi
+
+      - name: Run security audit
+        run: |
+          if [ "${{ steps.detect-pm.outputs.manager }}" = "pnpm" ]; then
+            pnpm audit --audit-level=high
+          elif [ "${{ steps.detect-pm.outputs.manager }}" = "yarn" ]; then
+            yarn audit --level high
+          else
+            npm audit --audit-level=high
+          fi
+
+  lint:
+    name: ESLint & Prettier
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Checkout shared configs
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ github.repository_owner }}/.github
+          path: .github-configs
+          sparse-checkout: configs
+
+      - name: Copy shared configs
+        run: |
+          mkdir -p configs
+          cp -r .github-configs/configs/* configs/
+          # Explicitly copy dotfiles which might be missed by sparse checkout
+          cp .github-configs/configs/.prettierignore configs/.prettierignore 2>/dev/null || true
+          rm -rf .github-configs
+
+      - name: Detect project type
+        id: detect-type
+        run: |
+          if grep -q '"next"' package.json 2>/dev/null; then
+            echo "type=nextjs" >> $GITHUB_OUTPUT
+          elif grep -q '"react"' package.json 2>/dev/null || grep -q '"react-native"' package.json 2>/dev/null; then
+            echo "type=react" >> $GITHUB_OUTPUT
+          else
+            echo "type=node" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Copy .prettierignore from configs
+        run: |
+          cp configs/.prettierignore .prettierignore
+          # Ensure config files are explicitly ignored
+          echo "eslint.config.js" >> .prettierignore
+          echo "prettier.config.js" >> .prettierignore
+
+      - name: Create ESLint config
+        run: |
+          cat > eslint.config.js << 'EOF'
+          import config from './configs/${{ steps.detect-type.outputs.type }}.js';
+          export default config;
+          EOF
+
+      - name: Create Prettier config
+        run: |
+          cat > prettier.config.js << 'EOF'
+          import config from './configs/prettier.js';
+          export default config;
+          EOF
+
+      - name: Detect package manager
+        id: detect-pm
+        run: |
+          if [ -f "pnpm-lock.yaml" ]; then
+            echo "manager=pnpm" >> $GITHUB_OUTPUT
+            # Check if packageManager is specified in package.json
+            if grep -q '"packageManager"' package.json 2>/dev/null; then
+              echo "pnpm-version=" >> $GITHUB_OUTPUT
+            else
+              echo "pnpm-version=latest" >> $GITHUB_OUTPUT
+            fi
+          elif [ -f "yarn.lock" ]; then
+            echo "manager=yarn" >> $GITHUB_OUTPUT
+          else
+            echo "manager=npm" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Setup pnpm
+        if: steps.detect-pm.outputs.manager == 'pnpm'
+        uses: pnpm/action-setup@v4
+        with:
+          version: ${{ steps.detect-pm.outputs.pnpm-version }}
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: ${{ steps.detect-pm.outputs.manager }}
+
+      - name: Install dependencies
+        run: |
+          if [ "${{ steps.detect-pm.outputs.manager }}" = "pnpm" ]; then
+            pnpm install --frozen-lockfile
+          elif [ "${{ steps.detect-pm.outputs.manager }}" = "yarn" ]; then
+            yarn install --frozen-lockfile
+          else
+            npm ci
+          fi
+
+      - name: Install ESLint & Prettier dependencies
+        run: |
+          # Only install packages that aren't already in package.json or configs
+          DEPS=""
+          
+          # Check each dependency in both package.json and configs
+          if ! grep -q '"eslint"' package.json 2>/dev/null; then
+            DEPS="$DEPS eslint@^9.0.0"
+          fi
+          
+          if ! grep -q '"@eslint/js"' package.json 2>/dev/null && grep -q 'from "@eslint/js"' configs/${{ steps.detect-type.outputs.type }}.js 2>/dev/null; then
+            DEPS="$DEPS @eslint/js@^9.0.0"
+          fi
+          
+          if ! grep -q '"@typescript-eslint' package.json 2>/dev/null && ! grep -q '"typescript-eslint"' package.json 2>/dev/null; then
+            if grep -q 'from "@typescript-eslint' configs/${{ steps.detect-type.outputs.type }}.js 2>/dev/null; then
+              DEPS="$DEPS @typescript-eslint/eslint-plugin@^8.0.0 @typescript-eslint/parser@^8.0.0"
+            fi
+          fi
+          
+          if ! grep -q '"prettier"' package.json 2>/dev/null; then
+            DEPS="$DEPS prettier@^3.0.0"
+          fi
+
+          if [ "${{ steps.detect-type.outputs.type }}" = "react" ] || [ "${{ steps.detect-type.outputs.type }}" = "nextjs" ]; then
+            if ! grep -q '"eslint-plugin-react"' package.json 2>/dev/null; then
+              if grep -q 'eslint-plugin-react' configs/${{ steps.detect-type.outputs.type }}.js 2>/dev/null; then
+                DEPS="$DEPS eslint-plugin-react@^7.35.0 eslint-plugin-react-hooks@^5.0.0"
+              fi
+            fi
+          fi
+
+          # Only install if DEPS is not empty
+          if [ -n "$DEPS" ]; then
+            if [ "${{ steps.detect-pm.outputs.manager }}" = "pnpm" ]; then
+              pnpm add -D $DEPS
+            elif [ "${{ steps.detect-pm.outputs.manager }}" = "yarn" ]; then
+              yarn add -D $DEPS
+            else
+              npm install --save-dev $DEPS --legacy-peer-deps
+            fi
+          fi
+
+      - name: Run Prettier check
+        run: |
+          if [ "${{ steps.detect-pm.outputs.manager }}" = "pnpm" ]; then
+            pnpm exec prettier --check . --ignore-path .prettierignore
+          elif [ "${{ steps.detect-pm.outputs.manager }}" = "yarn" ]; then
+            yarn prettier --check . --ignore-path .prettierignore
+          else
+            npx prettier --check . --ignore-path .prettierignore
+          fi
+
+      - name: Run ESLint
+        run: |
+          if [ "${{ steps.detect-pm.outputs.manager }}" = "pnpm" ]; then
+            pnpm exec eslint .
+          elif [ "${{ steps.detect-pm.outputs.manager }}" = "yarn" ]; then
+            yarn eslint .
+          else
+            npx eslint .
+          fi
+
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Detect package manager
+        id: detect-pm
+        run: |
+          if [ -f "pnpm-lock.yaml" ]; then
+            echo "manager=pnpm" >> $GITHUB_OUTPUT
+            # Check if packageManager is specified in package.json
+            if grep -q '"packageManager"' package.json 2>/dev/null; then
+              echo "pnpm-version=" >> $GITHUB_OUTPUT
+            else
+              echo "pnpm-version=latest" >> $GITHUB_OUTPUT
+            fi
+          elif [ -f "yarn.lock" ]; then
+            echo "manager=yarn" >> $GITHUB_OUTPUT
+          else
+            echo "manager=npm" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Setup pnpm
+        if: steps.detect-pm.outputs.manager == 'pnpm'
+        uses: pnpm/action-setup@v4
+        with:
+          version: ${{ steps.detect-pm.outputs.pnpm-version }}
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: ${{ steps.detect-pm.outputs.manager }}
+
+      - name: Install dependencies
+        run: |
+          if [ "${{ steps.detect-pm.outputs.manager }}" = "pnpm" ]; then
+            pnpm install --frozen-lockfile
+          elif [ "${{ steps.detect-pm.outputs.manager }}" = "yarn" ]; then
+            yarn install --frozen-lockfile
+          else
+            npm ci
+          fi
+
+      - name: Build
+        run: |
+          if [ "${{ steps.detect-pm.outputs.manager }}" = "pnpm" ]; then
+            pnpm run build
+          elif [ "${{ steps.detect-pm.outputs.manager }}" = "yarn" ]; then
+            yarn build
+          else
+            npm run build
+          fi

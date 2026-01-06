@@ -1,0 +1,36 @@
+# Lock files
+pnpm-lock.yaml
+package-lock.json
+yarn.lock
+bun.lockb
+
+# Generated files
+version.js
+
+# Node modules and builds
+node_modules
+dist
+build
+.next
+out
+coverage
+next-env.d.ts
+
+# Config files (keep separate configs from being formatted)
+configs/
+eslint.config.js
+prettier.config.js
+eslint.config.mjs
+prettier.config.mjs
+*.config.js
+**/*.config.js
+
+# Specific dotfiles to ignore
+.env
+.env.local
+.env.production
+.DS_Store
+.cache
+.turbo
+
+seed/
