@@ -34,3 +34,7 @@ prettier.config.mjs
 .turbo
 
 seed/
+
+# AWS deployment files
+apprunner.yaml
+amplify.yml
