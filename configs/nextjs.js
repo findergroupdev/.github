@@ -21,6 +21,7 @@ export default [
       "eslint.config.*",
       "prettier.config.*",
       "**/components/ui/**",
+      "next.config.ts",
     ],
   },
   // TypeScript/TSX files configuration

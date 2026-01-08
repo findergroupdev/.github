@@ -19,6 +19,7 @@ export default [
       "**/*.config.cjs",
       "eslint.config.*",
       "prettier.config.*",
+      "next.config.ts",
     ],
   },
   // TypeScript files configuration
